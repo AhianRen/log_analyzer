@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nt.log_analyzer.dao.LogModelDao">
+	<!-- <resultMap id="resultMap" type="com.nt.log_analyzer.model.LogModel">
+		<id property="id" column="id"/>
+		<result property="fileId" column="fileId"/>
+		<result property="rowNumber" column="rowNumber"/>
+		<result property="timeStamp" column="timeStamp"  javaType="java.util.Date" jdbcType="TIMESTAMP"/>
+		<result property="milliSecond" column="milliSecond"/>
+		<result property="proceedingId" column="proceedingId"/>
+		<result property="threadName" column="threadName"/>
+		<result property="priority" column="priority"/>
+		<result property="executeTime" column="executeTime"/>
+		<result property="className" column="className"/>
+		<result property="message" column="message"/>
+	</resultMap> -->
+
+	<sql id="tableName">log</sql>
+	<sql id="insertField">fileName,rowNumber,timeStamp,milliSecond,proceedingId,threadName,priority,executeTime,className,message</sql>
+
+	
+	<!-- oracle的insert语句 -->
+	<!-- <insert id="insertLogModel" parameterType="logModel">
+		<selectKey keyProperty="logModelID" order="BEFORE" resultType="long">
+			select SEQ_LOGMODEL.nextval from dual
+		</selectKey>
+		insert into logmodel(<include refid="insertField"/>)
+		values(#{logModelID,jdbcType=BIGINT},#{rowNumber,jdbcType=BIGINT},#{dateStamp,jdbcType=DATE},#{milliSecond,jdbcType=BIGINT},#{ProceedingID,jdbcType=INTEGER},#{threadName,jdbcType=VARCHAR},#{priority,jdbcType=VARCHAR},#{executeTime,jdbcType=BIGINT},#{className,jdbcType=VARCHAR},#{message,jdbcType=VARCHAR})
+	</insert> -->
+	
+	<insert id="insertLogModel" parameterType="logModel" useGeneratedKeys="true" keyProperty="id">
+		insert into <include refid="tableName"/>(<include refid="insertField"/>)
+		values(#{fileName},#{rowNumber},#{timeStamp},#{milliSecond},#{proceedingID},#{threadName},#{priority},#{executeTime},#{className},#{message})
+	</insert>
+	
+	<select id="selectLogModelById" parameterType="int" resultType="logModel">
+		select id,<include refid="insertField"/> from <include refid="tableName"/>
+		where id=#{id}
+	</select>
+	
+	<select id="selectLogModelsByDateRange" resultType="logModel">
+		select id,<include refid="insertField"/> from <include refid="tableName"/>
+		where timeStamp &gt;= #{fromTimeStamp} and timeStamp &lt;= #{toTimeStamp}
+	</select>
+
+	<select id="selectAllByIdDesc" resultType="logModel">
+		select id,<include refid="insertField"/> from <include refid="tableName"/>
+		order by id desc limit #{startRow},#{size}
+	</select>
+
+	<select id="selectAllCount" resultType="long">
+		select count(id) from <include refid="tableName"/> 
+	</select>
+	
+	<select id="selectResultCountByCondition" resultType="int">
+		select count(id) from
+		(select id from <include refid="tableName"/>
+		<if test="relatedType == 'and'">
+			<where>
+				<if test="ids != null">
+					<foreach collection="ids" item="item" open="id in (" close=")" separator=",">
+						#{item}
+					</foreach>
+				</if>22
+				<if test="fileName != null and fileName != ''">
+					and fileName = #{fileName}				
+				</if>
+				
+				<if test="timeStamp_from != null or timeStamp_to != null">
+					and (
+					<if test="timeStamp_from != null">
+					 	timeStamp &gt;= #{timeStamp_from} and
+					</if>
+					<if test="timeStamp_to != null">
+						timeStamp &lt;= #{timeStamp_to}
+					</if>
+					)
+				</if>
+
+				<if test="priority != null and priority != ''">
+					and priority = #{priority}
+				</if>
+			</where>
+		</if>
+		<if test="relatedType == 'or'">
+			<trim prefix="where" prefixOverrides="or |and">
+				<if test="ids != null">
+					<foreach collection="ids" item="item" open="id in (" close=")" separator=",">
+						#{item}
+					</foreach>
+				</if>
+				<if test="fileName != null and fileName != ''">
+					or fileName = #{fileName}				
+				</if>
+				
+				<if test="timeStamp_from != null or timeStamp_to != null">
+					or (
+					<if test="timeStamp_from != null">
+					 	timeStamp &gt;= #{timeStamp_from} and
+					</if>
+					<if test="timeStamp_to != null">
+						timeStamp &lt;= #{timeStamp_to}
+					</if>
+					)
+				</if>
+				
+				<if test="priority != null and priority != ''">
+					or priority = #{priority}
+				</if>
+			</trim>
+		</if>
+		
+		) as t
+	</select>
+	
+	<select id="selectLogModelsByCondition" resultType="logModel">
+		select id,<include refid="insertField"/> from
+		(select id,<include refid="insertField"/> from <include refid="tableName"/>
+		<!-- <where> -->
+		<if test="relatedType == 'and'">
+			<where>
+				<if test="ids != null">
+					<foreach collection="ids" item="item" open="id in (" close=")" separator=",">
+						#{item}
+					</foreach>
+				</if>
+				<if test="fileName != null and fileName != ''">
+					and fileName = #{fileName}				
+				</if>
+				
+				<if test="timeStamp_from != null or timeStamp_to != null">
+					and (
+					<if test="timeStamp_from != null">
+					 	timeStamp &gt;= #{timeStamp_from} and
+					</if>
+					<if test="timeStamp_to != null">
+						timeStamp &lt;= #{timeStamp_to}
+					</if>
+					)
+				</if>
+				
+				<if test="priority != null and priority != ''">
+					and priority = #{priority}
+				</if>
+			</where>
+		</if>
+		<if test="relatedType == 'or'">
+			<trim prefix="where" prefixOverrides="or |and">
+				<if test="ids != null">
+					<foreach collection="ids" item="item" open="id in (" close=")" separator=",">
+						#{item}
+					</foreach>
+				</if>
+				<if test="fileName != null and fileName != ''">
+					or fileName = #{fileName}				
+				</if>
+				
+				<if test="timeStamp_from != null or timeStamp_to != null">
+					or (
+					<if test="timeStamp_from != null">
+					 	timeStamp &gt;= #{timeStamp_from} and
+					</if>
+					<if test="timeStamp_to != null">
+						timeStamp &lt;= #{timeStamp_to}
+					</if>
+					)
+				</if>
+				
+				<if test="priority != null and priority != ''">
+					or priority = #{priority}
+				</if>
+			</trim>
+		</if>
+		
+		<!-- </where> -->
+		) as t 
+		<if test="size != 0">
+			limit #{startRow},#{size}
+		</if>
+	</select>
+	
+	<select id="selectAllPriority" resultType="string">
+		select priority from <include refid="tableName"/> 
+		group by priority
+	</select>
+	
+	<select id="selectCountByPriority" parameterType="string" resultType="int">
+		select count(id) from <include refid="tableName"/>
+		where priority=#{priority}
+	</select>
+	
+	<select id="selectAllThreadName" resultType="string">
+		select threadName from log group by threadName
+	</select>
+	
+	<select id="selectCountByThreadName" parameterType="string" resultType="int">
+		select count(id) from <include refid="tableName"/>
+		where threadName=#{threadName}
+	</select>
+
+
+
+</mapper>

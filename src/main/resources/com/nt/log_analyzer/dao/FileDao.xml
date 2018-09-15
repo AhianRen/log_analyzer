@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nt.log_analyzer.dao.FileDao">
+	<sql id="tableName">file</sql>
+	<sql id="insertField">fileAbsolutePath,lastModified,lastLine</sql>
+	<insert id="insertFileModel" parameterType="fileModel" useGeneratedKeys="true" keyProperty="fileId">
+		insert into <include refid="tableName"/>(<include refid="insertField"/>)
+		values(#{fileAbsolutePath},#{lastModified},#{lastLine})
+	</insert>
+	
+	<select id="selectByFileAbsolutePath" parameterType="string" resultType="fileModel">
+		select fileId,<include refid="insertField"/> from <include refid="tableName"/>
+		where fileAbsolutePath=#{fileAbsolutePath}
+	</select>
+	
+	<update id="updateById" parameterType="fileModel">
+		update file set lastLine=#{lastLine} , lastModified=#{lastModified} where fileId=#{fileId};
+	</update>
+	
+
+
+</mapper>

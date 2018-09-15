@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>日志查询</title>
+
+<script type="text/javascript" src="/js/jquery-easyui-1.5.5.4/jquery.min.js"></script>
+<script type="text/javascript" src="/js/jquery-easyui-1.5.5.4/jquery.easyui.min.js"></script>
+<script type="text/javascript" src="/js/jquery-easyui-1.5.5.4/locale/easyui-lang-zh_CN.js"></script>
+<script type="text/javascript" src="/js/search.js"></script>
+<link rel="stylesheet" type="text/css" 
+	href="/js/jquery-easyui-1.5.5.4/themes/icon.css"	/>
+<link rel="stylesheet" type="text/css" 
+	href="/js/jquery-easyui-1.5.5.4/themes/default/easyui.css"/>
+	<style type="text/css">
+		.textbox {
+			height: 26px;
+			margin: 0;
+			padding: 0 2px;
+			box-sizing: content-box;
+		}
+	</style>
+</head>
+<body class="easyui-layout">
+	
+	
+
+	<table id="tb" title="日志查询" class="easyui-datagrid" toolbar="#toolbar" data-options="url:'/log/home', fitColumns:true">
+			<thead>
+				<tr>
+					<th field='fileName',width="100">文件名</th>
+					<th field='timeStamp',width="100">时间戳</th>
+					<th field='milliSecond',width="100">毫秒数</th>
+					<th field='threadName',width="100">线程名</th>
+					<th field='priority',width="100">日志级别</th>
+					<th field='className',width="100">类名</th>
+					<th field='message',width="100">详情</th>
+				</tr>
+			</thead>
+
+		</table>
+		
+	
+		<div id="toolbar" >
+			文件名：<input type="text" name="fileName" class="textbox" />
+			时间从：<input type="text" name="timeStamp_from" value="yyyy-MM-dd HH:mm:ss"/><!-- class="easyui-datebox"  -->
+			到：<input type="text" name="timeStamp_to" value="yyyy-MM-dd HH:mm:ss">
+			<font color="red">线程名：</font><input type="text" name="threadName" class="textbox"/> 
+			日志级别：<input type="text" name="priority" class="textbox"/> <br/>
+			<font color="red">类名：</font><input type="text" name="className" class="textbox"/> 
+			<font color="red">详情：</font><input type="text" name="message" class="textbox"/> 
+			关联类型：
+			<select name="relatedType">
+				<option value="and">and</option>
+				<option value="or">or</option>
+			</select>
+			查询类型：
+			<select name="queryType">
+				<option value="lucene">lucene索引查</option>
+				<option value="mysql">mysql模糊查</option>
+			</select>
+						
+			
+			<a  class="easyui-linkbutton" iconCls="icon-search" onclick="obj.search();">查询</a>
+			<a  id="excel" class="easyui-linkbutton">导出Excel</a>
+			<a id="pdf" class="easyui-linkbutton" >导出PDF</a>
+			<a id="statistic" class="easyui-linkbutton">统计分析</a>
+		</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	<!-- <div>
+		<form action="/query" method="get">
+			<input type="text" name="key">
+			<input type="submit" value="搜索">
+		</form>
+	</div>
+	<#if logResult??>
+		<#if logResult.code ==0>
+			<#list logResult.data as result>
+				${result.fileName!}		<br>
+				${result.fileContent!}	<hr/>
+			</#list>
+		<#else>
+			${logResult.msg}
+		</#if>
+	</#if> -->
+</body>
+</html>
