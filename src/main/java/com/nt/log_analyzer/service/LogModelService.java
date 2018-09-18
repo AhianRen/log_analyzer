@@ -11,10 +11,10 @@ import com.nt.log_analyzer.model.LogModel;
 public interface LogModelService {
 
 	List<LogModel> getLogModelsByDateRange(Date fromTimeStamp, Date toTimeStamp);
-	List<LogModel> getHome(int startRow,int size);
-	long getAllCount();
-	Map<String, Object> getResultByCondition(String fileName,String timeStamp_from, String timeStamp_to, String threadName,
-			String className, String priority, String message, int startRow, int size,String relatedType) throws Exception;
+
+	Map<String, Object> getResultByCondition(String fileName, String timeStamp_from, String timeStamp_to,
+			String threadName, String className, String priority, String message, int startRow, int size,
+			String relatedType, String queryType) throws Exception;
 	
 	
 	

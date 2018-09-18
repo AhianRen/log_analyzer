@@ -29,7 +29,7 @@ public class StatisticController {
 	public String statistic(Model model) {
 		Map<String, Integer> map = statisticService.count();
 		model.addAttribute("result", map);
-		
+		System.out.println(map.toString());
 		//return map;
 		return "statistic";
 	}
@@ -67,13 +67,13 @@ public class StatisticController {
 	public String poll() {
 		try {
 			indexService.poll();
-			return "创建成功";
+			
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return "创建失败";
 		}
-		
+		return "创建成功";
 	}
 	
 	

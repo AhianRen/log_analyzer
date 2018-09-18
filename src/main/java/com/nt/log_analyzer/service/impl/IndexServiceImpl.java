@@ -3,44 +3,42 @@ package com.nt.log_analyzer.service.impl;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.IntField;
 import org.apache.lucene.document.LongField;
 import org.apache.lucene.document.StoredField;
-import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.NumericRangeQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.Directory;
 import org.apache.lucene.search.BooleanClause.Occur;
-import org.apache.lucene.search.highlight.Fragmenter;
-import org.apache.lucene.search.highlight.Highlighter;
-import org.apache.lucene.search.highlight.QueryScorer;
-import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
-import org.apache.lucene.search.highlight.SimpleSpanFragmenter;
-import org.apache.lucene.search.highlight.TokenSources;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,19 +48,24 @@ import com.nt.log_analyzer.dao.FileDao;
 import com.nt.log_analyzer.dao.LogModelDao;
 import com.nt.log_analyzer.model.FileModel;
 import com.nt.log_analyzer.model.LogModel;
+import com.nt.log_analyzer.model.config.Config;
 import com.nt.log_analyzer.model.config.MyConfig;
 import com.nt.log_analyzer.service.IndexService;
+import com.nt.log_analyzer.utils.FileUtil;
 import com.nt.log_analyzer.utils.IndexUtils;
 import com.nt.log_analyzer.utils.JsonUtil;
+import com.nt.log_analyzer.utils.YmlUtil;
+
 @Service
 public class IndexServiceImpl implements IndexService{
 
-	
+	private final static Logger logger = LoggerFactory.getLogger(IndexServiceImpl.class);
 	@Autowired
 	private LogModelDao logModelDao;
 	
+	
 	@Autowired
-	private MyConfig myConfig;
+	private Config config;
 	
 	@Autowired
 	private FileDao fileDao;
@@ -76,259 +79,380 @@ public class IndexServiceImpl implements IndexService{
 	@Override
 	@Transactional
 	public void poll() throws Exception {
-
-		File sourcePath = new File(myConfig.getLogFilePath());
-		File indexPath = new File(myConfig.getIndexPath());
+		//=============================================
+		String indexPath = config.getIndexpath();
+		List<Map<String,String[]>> configs = config.getConfigs();
+		for (Map<String, String[]> map : configs) {
+			File logFiles = new File(map.get("logfilePath")[0]);
+			File[] listFiles = logFiles.listFiles();
+			String regex =YmlUtil.ymlArrayToString(map.get("logregex"));
+			String dateFormat = map.get("datePattern")[0];
+			String[] filteWorlds = map.get("filterwords");
+			String[] logModelFieldNameArray = map.get("logparameter");
+			
+			for(File file : listFiles) {
+				
+				int count =  FileUtil.getFileRowNumber(file);
+				
+				//判断文件状态
+				//从数据库中查有没有该文件
+				FileModel model = fileDao.selectByFileAbsolutePath(file.getAbsolutePath());
+				
+				//新增文件(数据库中没有该文件)
+				if (model == null) { 
+					logger.info("新增文件"+file.getAbsolutePath());
+					FileModel fileModel = new FileModel();
+					fileModel.setFileAbsolutePath(file.getAbsolutePath());
+					fileModel.setLastLine(count);
+					fileModel.setLastModified(file.lastModified());
+					fileDao.insertFileModel(fileModel);
+					
+					//格式化
+					
+					logFileFormatToDBAndIndex(indexPath,file, 1, count, regex, logModelFieldNameArray, dateFormat,filteWorlds);
+					
+				}else if (file.lastModified() == model.getLastModified() ) { //文件未修改
+					logger.info("当前文件未被修改"+file.getAbsolutePath());
+					continue;
+				}else {//文件被修改
+					//FileModel fileModel = fileDao.selectByFileAbsolutePath(file.getAbsolutePath());
+					int startRow = model.getLastLine()+1; 
+					logger.info("当前文件被修改，"+model.getFileAbsolutePath()+"  startRow="+startRow);
+					//更新lastLine
+					model.setLastLine(count);
+					model.setLastModified(file.lastModified());
+					fileDao.updateById(model);
+					
+					logFileFormatToDBAndIndex(indexPath,file, startRow, count, regex, logModelFieldNameArray, dateFormat,filteWorlds);
+				
+				
+				}
+			}
+			
+			
+			
+		}
+		
+		//=============================================
+		/*File sourcePath = new File(myConfig.getLogFilePath());
 		File[] listFiles = sourcePath.listFiles();
-		for(File file : listFiles) {
-			/*
-			 TODO 
-			 判断文件状态，
-			  若新增
-			   	读完文件，获取最后一行的行号，将file保存到数据库中并返回id，
-			   	新建索引
-			   		读文件，格式化，建索引
-			  若修改
-				从数据库中获取lastLine+1，从该行开始按行读，匹配，获取logModels,插入数据库，更新索引
-			若未修改
-				继续循环
-			*/
-			
-			
-			
-			FileInputStream fis = new FileInputStream(file);
-			InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
-			BufferedReader br = new BufferedReader(isr);
-			int count = 0;
-			while(br.readLine()!=null) {
-				count++;
-			}
-			br.close();
-			isr.close();
-			fis.close();
-			
-			//判断文件状态
-			//从数据库中查有没有该文件
-			FileModel model = fileDao.selectByFileAbsolutePath(file.getAbsolutePath());
-			
-			//新增文件(数据库中没有该文件)
-			if (model == null) { 
-				System.out.println("新增文件"+file.getAbsolutePath());
-				FileModel fileModel = new FileModel();
-				fileModel.setFileAbsolutePath(file.getAbsolutePath());
-				fileModel.setLastLine(count);
-				fileModel.setLastModified(file.lastModified());
-				fileDao.insertFileModel(fileModel);
-				
-				//格式化
-				String[] logModelFieldNameArray = JsonUtil.jsonStrToStringArray(myConfig.getLogParameter());
-				List<LogModel> logModels =logList(fileModel.getFileAbsolutePath().substring(fileModel.getFileAbsolutePath().lastIndexOf('\\')+1),1, myConfig.getLogRegex(), file.getAbsolutePath(), logModelFieldNameArray, myConfig.getDatePattern());
-				//插入数据库并创建索引 
-				creatIndex(logModels, fileModel);
-			}else if (file.lastModified() == model.getLastModified() ) { //文件未修改
-				System.out.println("当前文件未被修改"+file.getAbsolutePath());
-				continue;
-			}else {//文件被修改
-				//FileModel fileModel = fileDao.selectByFileAbsolutePath(file.getAbsolutePath());
-				int startRow = model.getLastLine()+1; 
-				System.out.println("当前文件被修改，"+model.getFileAbsolutePath()+"  startRow="+startRow);
-				//更新lastLine
-				model.setLastLine(count);
-				model.setLastModified(file.lastModified());
-				fileDao.updateById(model);
-				
-				//格式化
-				String[] logModelFieldNameArray = JsonUtil.jsonStrToStringArray(myConfig.getLogParameter());
-				List<LogModel> logModels = logList(model.getFileAbsolutePath().substring(model.getFileAbsolutePath().lastIndexOf('\\')+1),startRow, myConfig.getLogRegex(), file.getAbsolutePath(), logModelFieldNameArray, myConfig.getDatePattern());
-				//插入数据库并创建索引
-				creatIndex(logModels, model);
-			}
-		}
+		
+		String regex = myConfig.getLogRegex();
+		String dateFormat = myConfig.getDatePattern();
+		String[] logModelFieldNameArray = JsonUtil.jsonStrToStringArray(myConfig.getLogParameter());*/
+
+		
+	
 		
 		
 	}
 	
 	/**
-	 *插入数据库并创建索引
+	 *将logModel插入数据库并创建索引
 	 */
 	@Override
-	@Transactional
-	public void creatIndex(List<LogModel> logModels,FileModel fileModel) throws Exception {
+	public void creatIndex(List<LogModel> logModels,String indexPath){
 		
-		IndexWriter indexWriter = IndexUtils.getIndexWriter(myConfig.getIndexPath());
-	
-		for (LogModel logModel : logModels) {
+		IndexWriter indexWriter = null;
+		try {
+			indexWriter = IndexUtils.getIndexWriter(indexPath);
+				
+		 		//logModelDao.insertLogModel(logModel);
+				for (LogModel logModel : logModels) {
+					Document document = new Document();
+					//文件相关
+					//document.add(new StringField("filePath", fileModel.getFileAbsolutePath(), Store.YES));
+					//document.add(new LongField("lastModified", fileModel.getLastModified(),Store.YES));
+					//日志相关
+				
+					document.add(new IntField("logModelId", logModel.getId(),Store.YES));
+					document.add(new IntField("rowNumber", logModel.getRowNumber(), Store.YES));
+					//==========================================================
+					if (StringUtils.isNotBlank(logModel.getFileName())) {
+						document.add(new TextField("fileName", logModel.getFileName(),Store.YES));
+					}
+					if (logModel.getTimeStamp() != null) {
+						document.add(new LongField("timeStamp", logModel.getTimeStamp().getTime(), Store.YES));
+					}
+					
+					if (logModel.getMilliSecond()!=null) {
+						document.add(new StoredField("milliSecond", logModel.getMilliSecond()));
+					}
+					if (StringUtils.isNotBlank(logModel.getPriority())) {
+						document.add(new TextField("priority", logModel.getPriority(),Store.YES));
+					}
+					
+					//============================================================
+					
+					if (StringUtils.isNotBlank(logModel.getThreadName())) {
+						document.add(new TextField("threadName", logModel.getThreadName(),Store.YES));
+					}
+					if (StringUtils.isNotBlank(logModel.getClassName())) {
+						document.add(new TextField("className",logModel.getClassName(),Store.YES));
+					}
+					if (StringUtils.isNotBlank(logModel.getMessage())) {
+						document.add(new TextField("message", logModel.getMessage(), Store.YES));
+					}
+					
+					indexWriter.addDocument(document);
+				}
 			
-			logModelDao.insertLogModel(logModel);
-			
-			Document document = new Document();
-			//文件相关
-			//document.add(new StringField("filePath", fileModel.getFileAbsolutePath(), Store.YES));
-			//document.add(new LongField("lastModified", fileModel.getLastModified(),Store.YES));
-			//日志相关
-			//TODO threadName、className、message 的Store.YES之后改为NO
-			document.add(new IntField("logModelId", logModel.getId(),Store.YES));
-			document.add(new TextField("threadName", logModel.getThreadName(),Store.YES));
-			document.add(new TextField("className",logModel.getClassName(),Store.YES));
-			document.add(new TextField("message", logModel.getMessage(), Store.YES));
-			indexWriter.addDocument(document);
+				
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}finally {
+			try {
+				indexWriter.commit();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			try {
+				indexWriter.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
-		indexWriter.commit();
-		indexWriter.close();
+
+		
+		
 	}
 	
 	/**
-	 * 根据threadName, className, message查
+	 * 通过lucene索引查
 	 */
 	@Override
-	public List<Integer> getIdsByIndex(int resultCount,String threadName,String className,String message,String relatedType) throws Exception {
-		IndexSearcher indexSearcher = IndexUtils.getIndexSearch(myConfig.getIndexPath());
+	public Map<String,Object> selectByIndex(String indexPath,int pageIndex, int pageSize,String fileName,Date timeStamp_from, Date timeStamp_to,String priority,String threadName,String className,String message,String relatedType) throws Exception {
+		IndexSearcher indexSearcher = IndexUtils.getIndexSearch(indexPath);
 		BooleanQuery booleanQuery = new BooleanQuery();
+	
+		Occur occur = Occur.MUST;
 		
+		if ("or".equals(relatedType)) {
+			occur = Occur.SHOULD;
+		}
+		if ("and".equals(relatedType)) {
+			occur = Occur.MUST;
+		}
 		
+		if (StringUtils.isNotBlank(fileName)) {
+			QueryParser queryParser = new QueryParser("fileName", new IKAnalyzer());
+			Query query = queryParser.parse(fileName);
+			booleanQuery.add(query,occur);
+		}
+		
+		Query timeStampQuery = NumericRangeQuery.newLongRange("timeStamp",timeStamp_from==null?null:timeStamp_from.getTime(),timeStamp_to==null?null:timeStamp_to.getTime(),true, true);
+		booleanQuery.add(timeStampQuery,occur);
+		
+		if(StringUtils.isNotBlank(priority)) {
+			QueryParser queryParser = new QueryParser("priority", new IKAnalyzer());
+			Query query = queryParser.parse(priority);
+			booleanQuery.add(query,occur);
+		}
 		
 		if (StringUtils.isNotBlank(threadName)) {
 			QueryParser queryParser = new QueryParser("threadName", new IKAnalyzer());
 			Query query = queryParser.parse(threadName);
-			
-			//Query query = new TermQuery(new Term("threadName", threadName));
-			if ("or".equals(relatedType)) {
-				booleanQuery.add(query, Occur.SHOULD);
-			}else if ("and".equals(relatedType)) {
-				booleanQuery.add(query, Occur.MUST);
-			}
-			
+			booleanQuery.add(query,occur);
 		}
 		if (StringUtils.isNotBlank(className)) {
 			QueryParser queryParser = new QueryParser("className", new IKAnalyzer());
 			Query query = queryParser.parse(className);
-			//Query query = new TermQuery(new Term("className", className));
-			if ("or".equals(relatedType)) {
-				booleanQuery.add(query, Occur.SHOULD);
-			}else if ("and".equals(relatedType)) {
-				booleanQuery.add(query, Occur.MUST);
-			}
+				booleanQuery.add(query,occur);
 		}
-		
 		if (StringUtils.isNotBlank(message)) {
 			QueryParser queryParser = new QueryParser("message", new IKAnalyzer());
 			Query query = queryParser.parse(message);
-			//Query query = new TermQuery(new Term("message", message));
-			if ("or".equals(relatedType)) {
-				booleanQuery.add(query, Occur.SHOULD);
-			}else if ("and".equals(relatedType)) {
-				booleanQuery.add(query, Occur.MUST);
-			}
+				booleanQuery.add(query,occur);
 		}
 		
-		TopDocs topDocs = indexSearcher.search(booleanQuery, resultCount);
+		ScoreDoc lastSd = getLastScoreDoc(pageIndex, pageSize, booleanQuery, indexSearcher);
+		TopDocs topDocs = indexSearcher.searchAfter(lastSd, booleanQuery, pageSize);
 		
-		List<Integer> logModelIds = new ArrayList<>();
+		Map<String,Object> map = new HashMap<>();
+		List<LogModel> logModels = new LinkedList<>();
+		
+		if (topDocs.scoreDocs.length==0) {
+			map.put("total", 0);
+			map.put("rows", "");
+			return map;
+		}
 		
 		for (ScoreDoc scoreDoc:topDocs.scoreDocs) {
 			Document document = indexSearcher.doc(scoreDoc.doc);
-			Integer logModelId = Integer.valueOf(document.get("logModelId"));
-			//根据logModelId 查
-			//LogModel logModel = logModelDao.selectLogModelById(logModelId);
-			logModelIds.add(logModelId);
+			LogModel logModel = new LogModel();
+			logModel.setId(Integer.parseInt(document.get("logModelId")));
+			logModel.setRowNumber(Integer.parseInt(document.get("rowNumber")));
+			logModel.setFileName(document.get("fileName"));
+			logModel.setTimeStamp(new Date(Long.parseLong(document.get("timeStamp"))));
+			logModel.setMilliSecond(Integer.valueOf(document.get("milliSecond")));
+			logModel.setPriority(document.get("priority"));
+			logModel.setThreadName(document.get("threadName"));
+			logModel.setClassName(document.get("className"));
+			logModel.setMessage(document.get("message"));
+			logModels.add(logModel);
 		}
-		return logModelIds;
+		map.put("total", topDocs.totalHits);
+		map.put("rows", logModels);
+		
+		indexSearcher.getIndexReader().close();
+		
+		return map;
 	}
 	
-	/**
-	 * 判断文件状态
-	 * @param file
-	 * @return 0:新增文件(索引中没有该文件)，1：文件被修改，-1：文件未修改
-	 * @throws Exception
-	 */
-	/*private  byte checkFileStatus(File indexPath,File file) throws Exception{
-		
-		if (indexPath.list().length == 0) {
-			return 0;
-		}
-		//file
-		List<String> list = selectByTermName(1, file.getAbsolutePath(), "lastModified");
-		if (list.size() == 0) {
-			return 0;
-		}
-		
-		if (file.lastModified() != Long.parseLong(list.get(0))) {
-			return 1;
-		}else {
-			return -1;
-		}
-	}*/
+	
 	
 	//==============================================
 	/**
-	 * 按行读取log文件，将其格式化为LogModel类型的List
-	 * @param fileName 文件名
+	 * 按行读取log文件，将其格式化为LogModel，并插入数据库、创建索引
+	 * @param file 要格式化的文件
 	 * @param startRow 开始读取的行号
+	 * @param count 当前文件的总行数
 	 * @param regex 日志每行的正则表达式
-	 * @param filePathAndName 日志文件路径+文件名
 	 * @param logModelFieldNameArray LogModel的属性数组(顺序与正则表达式中的每个分组顺序一致)
 	 * @param dateFormat LogModel的属性数组中Date类型的日期格式(如果有的话)
 	 * @return
 	 * @throws Exception
 	 */
-	private List<LogModel> logList(String fileName,int startRow,String regex, String filePathAndName, String[] logModelFieldNameArray,
-			String dateFormat) throws Exception {
+	@Transactional
+	private void logFileFormatToDBAndIndex(String indexPath,File file,int startRow,long count,String regex,String[] logModelFieldNameArray,
+			String dateFormat,String[] filteWorlds){
 
-		FileInputStream fis = new FileInputStream(filePathAndName);
-		InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
-		BufferedReader br = new BufferedReader(isr);
-		String line = null;
-
-		List<LogModel> logModels = new ArrayList<>();
-
-		for (int i = 1; (line = br.readLine()) != null; i++) {
+		FileInputStream fis = null;
+		InputStreamReader isr = null;
+		BufferedReader br = null;
+		try {
+			fis = new FileInputStream(file.getAbsolutePath());
+			isr = new InputStreamReader(fis, "UTF-8");
+			br = new BufferedReader(isr);
+			String line = null;
 			
-			if (i < startRow) {
-				continue;
-			}
 			
-			if (StringUtils.isBlank(line)) {
-				continue;
-			}
+			//LogModel logModel = new LogModel();
 			
-			//日志过滤
-			if (logFilter(line)) {
-				continue;
-			}
+			Deque<LogModel> deque = new LinkedBlockingDeque<>(11000);
 			
-			Pattern pattern = Pattern.compile(regex);
-			Matcher matcher = pattern.matcher(line);
-
-			if (matcher.matches()) {
-				LogModel logModel = new LogModel();
-				setLogModel(logModel, matcher, logModelFieldNameArray, dateFormat);
-				logModel.setRowNumber(i);
-				logModel.setFileName(fileName);
-				logModels.add(logModel);
-			} else {
-
-				if (logModels.size() == 0) {
-					// 新建LogModel并插入
-					LogModel logModel = new LogModel();
+			
+			
+			for (int i = 1; (line = br.readLine()) != null; i++) {
+				
+				if (i < startRow) {
+					continue;
+				}
+				
+				if (StringUtils.isBlank(line)) {
+					continue; 
+				}
+				
+				//日志过滤
+				if (FileUtil.logFilter(line,filteWorlds)) {
+					continue;
+				}
+				
+				Pattern pattern = Pattern.compile(regex);
+				Matcher matcher = pattern.matcher(line);
+				
+				if (matcher.matches()) {//匹配成功
+					
+					List<LogModel> logModels = new LinkedList<>();
+					
+					if (deque.size() > 10002) { //匹配成功，且队列元素大于100002
+						for(int j=0;j<10000;j++) {
+							LogModel firstLogModel = deque.pollFirst();
+							logModels.add(firstLogModel);
+						
+						}
+						//批量入库并创建索引
+						int z = logModelDao.insertBatch(logModels);
+						logger.info("批量插入了："+z+"条数据");
+						creatIndex(logModels,indexPath);
+			
+					}
+					
+					LogModel logModel = new LogModel(); //新建LogModel并赋值
+					logModel.setFileName(file.getAbsolutePath().substring(file.getAbsolutePath().lastIndexOf("\\")+1));
 					logModel.setRowNumber(i);
-					logModel.setFileName(fileName);
-					logModel.setMessage(line);
-					logModels.add(logModel);
-				} else {
-					// 获取LOGModels最后一个元素的message 添加内容
-					LogModel logModel = logModels.get(logModels.size() - 1);
-					String message = logModel.getMessage();
-					logModel.setMessage(message + "\n" + line);
+					setLogModel(logModel, matcher, logModelFieldNameArray, dateFormat);
+					if (!deque.offerLast(logModel)) { //匹配成功，,从队尾插入队列
+						logger.debug("匹配成功，从队尾插入失败，当前行数："+i);
+					}
+					
+				} else { //匹配不成功
+					if (deque.isEmpty()) { //第一行匹配不成功
+						LogModel logModel = new LogModel();
+						logModel.setRowNumber(i);
+						logModel.setFileName(file.getAbsolutePath().substring(file.getAbsolutePath().lastIndexOf("\\")+1));
+						logModel.setMessage(line);
+						//新建LogModel,从队尾插入队列
+						if (!deque.offerLast(logModel)) {
+							logger.debug("第一行匹配不成功，从队尾插入失败");
+						}
+						
+						
+					}else { // 非第一行匹配不成功
+						LogModel lastLogModel = deque.peekLast(); //获取队尾元素，修改message
+						if (lastLogModel != null) {
+							String str = lastLogModel.getMessage();
+							lastLogModel.setMessage(str==null?line:str+"\n"+line);
+						}else {
+							logger.debug("匹配不成功，获取队尾失败，当前行数："+i);
+						}
+						 
+					}
 				}
 			}
-		}
+			logger.info("文件读取完成，队列中还有 "+deque.size()+" 个元素");
+			List<LogModel> logModels = new LinkedList<>();
+			int size = deque.size();
+			for(int j=0;j<size;j++) {
+				LogModel firstLogModel = deque.pollFirst();
+				logModels.add(firstLogModel);
+			
+			}
+			//批量入库并创建索引
+			int z = logModelDao.insertBatch(logModels);
+			logger.info("批量插入了："+z+"条数据");
+			creatIndex(logModels,indexPath);
 
-		br.close();
-		isr.close();
-		fis.close();
-		return logModels;
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}finally {
+			try {
+				br.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			try {
+				isr.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			try {
+				fis.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+		
 	}
 	
+	
+	
+	/**
+	 * 根据logModelFieldNameArray给logModel属性赋值
+	 * @param logModel
+	 * @param matcher
+	 * @param logModelFieldNameArray
+	 * @param dateFormat
+	 * @throws Exception
+	 */
 	private  void setLogModel(LogModel logModel,Matcher matcher, String[] logModelFieldNameArray, String dateFormat) throws Exception{
 		Class clazz = logModel.getClass();
 		
@@ -363,16 +487,7 @@ public class IndexServiceImpl implements IndexService{
 	}
 	
 	
-	private boolean logFilter(String str) {
-		String[] filteWorlds = JsonUtil.jsonStrToStringArray(myConfig.getFilterWords());
-		for (String s : filteWorlds) {
-			if(str.contains(s)) {
-				return true;
-			}
-		}
-		
-		return false;
-	}
+	
 	
 	//=======================================================
 	
@@ -381,23 +496,37 @@ public class IndexServiceImpl implements IndexService{
 	
 	
 	
-	public List<String> selectByTermName(int count,String key,String termName) throws Exception {
-		IndexSearcher indexSearcher = IndexUtils.getIndexSearch(myConfig.getIndexPath());
-		Query query = new TermQuery(new Term(termName,key));
-		TopDocs topDocs = indexSearcher.search(query, count);
-		List<String> list = new ArrayList<>();
-		for (ScoreDoc scoreDoc:topDocs.scoreDocs) {
-			Document document = indexSearcher.doc(scoreDoc.doc);
-			String str = document.get(termName);
-			list.add(str);
-		}
-		return list;
+
+	
+	
+	/**
+	 * 根据页码和分页大小获取上一次的最后一个scoredocs
+	 */
+	private ScoreDoc getLastScoreDoc(int pageIndex,int pageSize,Query query,IndexSearcher searcher) throws IOException {
+		if(pageIndex==1)return null;//如果是第一页就返回空
+		int num = pageSize*(pageIndex-1);//获取上一页的最后数量
+		TopDocs tds = searcher.search(query, num);
+		return tds.scoreDocs[num-1];
 	}
+	
+	
+	/*public List<String> selectByTermName(int count,String key,String termName) throws Exception {
+	IndexSearcher indexSearcher = IndexUtils.getIndexSearch(myConfig.getIndexPath());
+	Query query = new TermQuery(new Term(termName,key));
+	TopDocs topDocs = indexSearcher.search(query, count);
+	List<String> list = new ArrayList<>();
+	for (ScoreDoc scoreDoc:topDocs.scoreDocs) {
+		Document document = indexSearcher.doc(scoreDoc.doc);
+		String str = document.get(termName);
+		list.add(str);
+	}
+	return list;
+}*/
 	
 	/**
 	 * 高亮显示查询结果XXXXXX
 	 */
-	@Override
+	/*@Override
 	public Map<String,Object> getTopDocs(int resultCount,String key) throws Exception {
 		IndexSearcher indexSearcher = IndexUtils.getIndexSearch(myConfig.getIndexPath());
 		//默认查询的域
@@ -462,7 +591,7 @@ public class IndexServiceImpl implements IndexService{
 		
 	}
 
-	
+	*/
 
 
 	

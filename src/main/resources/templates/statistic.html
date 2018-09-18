@@ -5,10 +5,11 @@
 <title>统计分析</title>
 </head>
 <body>
-	<#list result?keys as key>
-		${key!} : ${result[key]!} <br/>
-	</#list>
-	
+	<if result??>
+		<#list result?keys as key>
+			${key!} :${result[key]!}<br/>
+		</#list>
+	</if>
 	
 </body>
 </html>

@@ -29,7 +29,7 @@
 			<thead>
 				<tr>
 					<th field='fileName',width="100">文件名</th>
-					<th field='timeStamp',width="100">时间戳</th>
+					<th field='timeStamp',width="100" formatter="dateFormat">时间戳</th>
 					<th field='milliSecond',width="100">毫秒数</th>
 					<th field='threadName',width="100">线程名</th>
 					<th field='priority',width="100">日志级别</th>
@@ -54,11 +54,11 @@
 				<option value="and">and</option>
 				<option value="or">or</option>
 			</select>
-			查询类型：
+			<!-- 查询类型：
 			<select name="queryType">
 				<option value="lucene">lucene索引查</option>
 				<option value="mysql">mysql模糊查</option>
-			</select>
+			</select> -->
 						
 			
 			<a  class="easyui-linkbutton" iconCls="icon-search" onclick="obj.search();">查询</a>

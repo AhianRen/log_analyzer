@@ -39,15 +39,12 @@ public class LogModelController {
 	
 	@RequestMapping("/log/home")
 	@ResponseBody
-	public Map<String, Object> home(@RequestParam(value="rows") String rows,@RequestParam("page") String page,
+	public Map<String, Object> home(@RequestParam(value="rows") int rows,@RequestParam("page") int page,
 			String timeStamp_from,String timeStamp_to,String threadName,String priority,String className,String message,String fileName,String relatedType,String queryType) throws Exception {
 		
-		//System.out.println("=======================");
-		if (StringUtils.isBlank(relatedType)) {
+	
+		if (!"and".equals(relatedType)&&!"or".equals(relatedType)) {
 			relatedType = "and";
-		}
-		if (StringUtils.isBlank(queryType)) {
-			queryType = "lucene";
 		}
 		
 		
@@ -57,35 +54,21 @@ public class LogModelController {
 		if ("yyyy-MM-dd HH:mm:ss".equals(timeStamp_to)) {
 			timeStamp_to = null;
 		}
-		int pageNum = Integer.parseInt(page);
-		int size = Integer.parseInt(rows);
-		int startRow = size*(pageNum-1);
+		//int pageNum = Integer.parseInt(page);
+		//int size = Integer.parseInt(rows);
+		//int startRow = size*(pageNum-1);
 		
-		Map<String, Object> map = new LinkedHashMap<>();
-		if ("lucene".equals(queryType)) {
-			 map = logModelService.getResultByCondition(fileName,timeStamp_from, timeStamp_to, threadName, className, priority, message, startRow,size,relatedType);
-		}else if ("mysql".equals(queryType)) {
-			
-		}
-		
-			
-		
-		
-		//List<LogModel> logModels = logModelService.getHome(0, 10);
-		//map.put("rows", logModels);
-		//map.put("total", count);
-		//for (LogModel logModel : logModels) {
-		//	System.out.println(logModel);
-		//}
-		
-		//model.addAttribute("logModels", logModels);
+
+		Map<String, Object> map = logModelService.getResultByCondition(fileName, timeStamp_from, timeStamp_to, threadName, className, priority, message, page, rows, relatedType, queryType);
 		
 		return map;
 	}
 	
 	@RequestMapping(value="/download/excel")
-	public void resultToExcel(String timeStamp_from,String timeStamp_to,String threadName,String priority,String className,String message,String fileName,String relatedType,String queryType,HttpServletResponse response){
-		//String fileName = "报表.xls";
+	public void resultToExcel(String timeStamp_from,String timeStamp_to,String threadName,String priority,String className,String message,String fileName,String relatedType,String queryType,int outCount,HttpServletResponse response){
+		if (!"and".equals(relatedType)&&!"or".equals(relatedType)) {
+			relatedType = "and";
+		}
 		if ("yyyy-MM-dd HH:mm:ss".equals(timeStamp_from)) {
 			timeStamp_from = null;
 		}
@@ -94,12 +77,11 @@ public class LogModelController {
 		}
 		//生成文件名
 		String caeatefileName = String.valueOf(System.currentTimeMillis())+".xls";
-		
 		ServletOutputStream sos = null;
 		try {
-			List<LogModel> logModels = (List<LogModel>) logModelService.getResultByCondition(fileName,timeStamp_from, timeStamp_to, threadName, className, priority, message, 0, 0,relatedType).get("rows");
+			List<LogModel> logModels = (List<LogModel>) logModelService.getResultByCondition(fileName, timeStamp_from, timeStamp_to, threadName, className, priority, message, 1, outCount, relatedType, queryType).get("rows");
 			
-			HSSFWorkbook excel = ExcelUtil.createExcel(caeatefileName, logModels, new LogModel(),"yyyy-MM-dd HH:mm:ss");
+			HSSFWorkbook excel = ExcelUtil.createExcel(caeatefileName,logModels , new LogModel(),"yyyy-MM-dd HH:mm:ss");
 			
 			caeatefileName = URLEncoder.encode(caeatefileName,"UTF-8");
 			response.setContentType("application/octet-stream");
@@ -127,7 +109,7 @@ public class LogModelController {
 	}
 	
 	@RequestMapping("/download/pdf")
-	public void resultToPdf(String timeStamp_from,String timeStamp_to,String threadName,String priority,String className,String message,String fileName,String relatedType,String queryType,HttpServletResponse response) throws Exception {
+	public void resultToPdf(String timeStamp_from,String timeStamp_to,String threadName,String priority,String className,String message,String fileName,String relatedType,String queryType,int outCount,HttpServletResponse response) throws Exception {
 		
 		if ("yyyy-MM-dd HH:mm:ss".equals(timeStamp_from)) {
 			timeStamp_from = null;
@@ -135,13 +117,12 @@ public class LogModelController {
 		if ("yyyy-MM-dd HH:mm:ss".equals(timeStamp_to)) {
 			timeStamp_to = null;
 		}
-		
 		String createfileName = String.valueOf(System.currentTimeMillis())+".pdf";
 		createfileName = URLEncoder.encode(createfileName,"UTF-8");
 		response.setContentType("application/pdf");
 		response.setHeader("Content-Disposition","attachment;filename="+createfileName);
 		
-		List<LogModel> logModels = (List<LogModel>) logModelService.getResultByCondition(fileName,timeStamp_from, timeStamp_to, threadName, className, priority, message, 0, 0,relatedType).get("rows");
+		List<LogModel> logModels = (List<LogModel>) logModelService.getResultByCondition(fileName, timeStamp_from, timeStamp_to, threadName, className, priority, message, 1, outCount, relatedType, queryType).get("rows");
 
 		PdfUtil.createPdf(logModels,response.getOutputStream());
 		

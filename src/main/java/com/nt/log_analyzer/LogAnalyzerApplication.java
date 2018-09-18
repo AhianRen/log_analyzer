@@ -9,5 +9,7 @@ public class LogAnalyzerApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(LogAnalyzerApplication.class, args);
+	
+	
 	}
 }

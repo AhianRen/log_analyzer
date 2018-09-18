@@ -1,0 +1,33 @@
+myconfig:
+  indexpath: D:\\upload\\lucene\\index1
+  configs: 
+    - logfilePath: D:\upload\lucene\sourcefile1
+      logregex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}),(\d+)\s\[(\S*)\]\s(\S*)\s+(\S*)\s-\s(.*)
+      logparameter: [timeStamp,milliSecond,threadName,priority,className,message]
+      datePattern: yyyy-MM-dd HH:mm:ss
+      filterwords: [Downloading,Downloaded,Copying]
+    - logfilePath: D:\upload\lucene\sourcefile2
+      logregex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}),(\d+)\s\[(\S*)\]\s(\S*)\s+(\S*)\s-\s(.*)
+      logparameter: [timeStamp,milliSecond,threadName,priority,className,message]
+      datePattern: yyyy-MM-dd HH:mm:ss
+      filterwords: [Downloading,Downloaded,Copying]
+# str: user
+# array: abc,bcd,cde
+# list:
+#   - xx
+#   - yy
+# map: 
+#   key1: value1
+#   key2: value2
+# listmap:
+#   - name: name1
+#     age: 10aaa
+#   - name: name2
+#     age: 11
+# maplist: 
+#   key3:
+#     - string1
+#     - string2
+#   key4:
+#     - string3
+#     - string4

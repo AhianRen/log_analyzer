@@ -1,6 +1,8 @@
 $(function(){
 	
+	
 	obj={
+			 
 		search:function(){
 			$('#tb').datagrid('load',{
 				timeStamp_from:$('input[name="timeStamp_from"]').val(),
@@ -15,6 +17,7 @@ $(function(){
 			});
 		},
 		download:function(type){
+			
 			var type = type;
 			var myform = $("<form></form>");
 	    	myform.attr('method','post')
@@ -51,7 +54,7 @@ $(function(){
 	    	
 	    	var relatedType = $("<input type='hidden' name='relatedType' />");
 	    	relatedType.attr('value',$('select[name="relatedType"] :selected').val());
-
+			
 	    	var queryType = $("<input type='hidden' name='queryType' />");
 	    	queryType.attr('value',$('select[name="queryType"] :selected').val());
 	    	
@@ -62,16 +65,53 @@ $(function(){
 	    	myform.append(className);
 	    	myform.append(message);
 	    	myform.append(fileName);
-//	    	myform.append(relatedType);
-	//    	myform.append(queryType);
+	    	//myform.append(relatedType);
+	    	//myform.append(queryType);
 	    	
-	    	myform.appendTo('body').submit();
+			var options = $('#tb').datagrid('getPager').data("pagination").options;
+			var page = options.pageNumber;//当前页数  
+			var total = options.total; //总记录数
+			var rows = options.pageSize;//每页的记录数（行数）
+			alert(total);
+			if(total>5000){
+				$.messager.prompt('数据量过大','查询结果有'+total+'条,大于50000条，请输入要导出的条数',function(count){
+			    	
+			    	//alert(count);
+			    	var outCount = $("<input type='hidden' name='outCount' />");
+			    	
+			    	if(count!=null){
+			    		outCount.attr('value',count);
+				    	myform.append(outCount);
+				    	
+				    	myform.appendTo('body').submit();
+			    	}
+			    	
+				
+				});
+			}else{
+				
+				if(total!=null||total==0){
+					alert('查询结果为空');
+				}else{
+					var outCount = $("<input type='hidden' name='outCount' />");
+					
+			    	outCount.attr('value',total);
+					myform.append(outCount);
+					myform.appendTo('body').submit();
+				}
+				
+				
+				
+			}
+			
+			
+			
 			
 		},
 	};
 	
+	
 	$('#tb').datagrid({
-		
 		pagination:true,
 		pageSize:10,
 		pageList:[10,20],
@@ -79,9 +119,16 @@ $(function(){
 		
 		onLoadSuccess:function(data){
 			/*alert("xx");*/
+		},
+		onDblClickCell:function(rowIndex, field, value){
+			/*$.messager.alert(field,value);*/
+			$.messager.alert({    
+				  width:1000, 
+				  title: field,  
+				  msg:'<div style="height:500px">' + value+'</div>',
+			});
 		}
-		
-	});
+	});	
 	
 	$('#excel').click(function(){
 		obj.download("excel");
@@ -93,13 +140,23 @@ $(function(){
 	$("#statistic").click(function(){
 		//var value = $('select[name="queryType"] :selected').val();
 		//$.get("/statistic");
+		
 		window.open("/statistic")
 	});
 	
 	
-	
-	
-	
-	
-	
 });
+
+function dateFormat(value){
+	
+	
+	var date = new Date(value);
+     var y = date.getFullYear();
+     var MM = date.getMonth() + 1;
+     var d = date.getDate();
+     var h = date.getHours();
+     var m = date.getMinutes();
+     var s = date.getSeconds()
+     return y+'-'+MM+'-'+d+' '+h+':'+m+':'+s;
+     /*return date.Format("yyyy-MM-dd HH:mm:ss");*/
+}

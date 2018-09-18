@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import com.nt.log_analyzer.dao.LogModelDao;
 import com.nt.log_analyzer.model.LogModel;
+import com.nt.log_analyzer.model.config.Config;
 import com.nt.log_analyzer.service.IndexService;
 import com.nt.log_analyzer.service.LogModelService;
 @Service
@@ -23,21 +24,16 @@ public class LogModelServiceImpl implements LogModelService{
 	@Autowired
 	private IndexService indexService;
 	
+	@Autowired
+	private Config config;
+	
 	@Override
 	public List<LogModel> getLogModelsByDateRange(Date fromTimeStamp,Date toTimeStamp){
 		return logModelDao.selectLogModelsByDateRange(fromTimeStamp, toTimeStamp);
 	}
 
-	@Override
-	public List<LogModel> getHome(int startRow, int size) {
-		return logModelDao.selectAllByIdDesc(startRow, size);
-	}
 	
-	@Override
-	public long getAllCount() {
-		return logModelDao.selectAllCount();
-		
-	}
+
 /*
 	@Override
 	public int getResultCount(List<Integer> ids, Date timeStamp_from, Date timeStamp_to, String priority) {
@@ -46,22 +42,8 @@ public class LogModelServiceImpl implements LogModelService{
 */
 	@Override
 	public Map<String, Object> getResultByCondition(String fileName,String timeStamp_from, String timeStamp_to,
-			String threadName,String className,String priority,String message,int startRow, int size,String relatedType) throws Exception {
+			String threadName,String className,String priority,String message,int startRow, int size,String relatedType,String queryType) throws Exception {
 		
-		Map<String, Object> map = new HashMap<>();
-		
-		long count = logModelDao.selectAllCount();
-		
-		List<Integer> ids = null;
-		
-		if (StringUtils.isNotBlank(threadName)||StringUtils.isNotBlank(className)||StringUtils.isNotBlank(message)) {
-			ids = indexService.getIdsByIndex((int)count, threadName, className, message,relatedType);
-			if (ids.size() == 0) {
-				map.put("total", 0);
-				map.put("rows", null);
-				return map;
-			}
-		}
 		
 		SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 		
@@ -74,19 +56,40 @@ public class LogModelServiceImpl implements LogModelService{
 			timeStamp_to1 = simpleDateFormat.parse(timeStamp_to);
 		}
 		
-		count = logModelDao.selectResultCountByCondition(ids, fileName,timeStamp_from1, timeStamp_to1, priority,relatedType);
-	
-		List<LogModel> logModels = logModelDao.selectLogModelsByCondition(ids,fileName, timeStamp_from1, timeStamp_to1, priority, startRow, size,relatedType);
+		return indexService.selectByIndex(config.getIndexpath(),startRow, size, fileName, timeStamp_from1, timeStamp_to1, priority, threadName, className, message, relatedType);
 		
-		map.put("total", count);
-		map.put("rows", logModels);
-		return map;
-	}
-	
-	public int selectResultCountByCondition(List<Integer>ids,String fileName,Date timeStamp_from, Date timeStamp_to,String priority,String relatedType) {
 		
-		return logModelDao.selectResultCountByCondition(ids, fileName,timeStamp_from, timeStamp_to, priority,relatedType);
+		/*
+		Map<String, Object> map = new HashMap<>();
+		//TODO 从lucene中查
+		long count = logModelDao.selectAllCount();
 		
+		List<Integer> ids = null;
+		List<LogModel> logModels = null;
+		
+		if ("lucene".equals(queryType)) {
+			if (StringUtils.isNotBlank(threadName)||StringUtils.isNotBlank(className)||StringUtils.isNotBlank(message)) {
+				ids = indexService.getIdsByIndex((int)count, threadName, className, message,relatedType);
+				if (ids.size() == 0) {
+					map.put("total", 0);
+					map.put("rows", "");
+					return map;
+				}
+			}
+			
+			count = logModelDao.selectResultCountByCondition(ids, fileName, timeStamp_from1, timeStamp_to1, priority, relatedType, null, null, null);
+			logModels = logModelDao.selectLogModelsByCondition(ids, fileName, timeStamp_from1, timeStamp_to1, priority, startRow, size, relatedType, null, null, null);
+			map.put("total", count);
+			map.put("rows", logModels);
+			
+		}else if ("mysql".equals(queryType)) {
+			count = logModelDao.selectResultCountByCondition(null, fileName, timeStamp_from1, timeStamp_to1, priority, relatedType, threadName, className, message);
+			logModels = logModelDao.selectLogModelsByCondition(null, fileName, timeStamp_from1, timeStamp_to1, priority, startRow, size, relatedType, threadName, className, message);
+			map.put("total", count);
+			map.put("rows", logModels);
+			
+		}
+		*/
 	}
 
 	

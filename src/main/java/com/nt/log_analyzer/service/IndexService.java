@@ -1,6 +1,7 @@
 package com.nt.log_analyzer.service;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -19,11 +20,26 @@ public interface IndexService {
 	 */
 	void poll() throws Exception;
 	
-	void creatIndex(List<LogModel> logModels,FileModel fileModel) throws Exception;
 	
-	Map<String, Object> getTopDocs(int resultCount, String key) throws Exception;
+
+	Map<String, Object> selectByIndex(String indexPath, int pageIndex, int pageSize, String fileName,
+			Date timeStamp_from, Date timeStamp_to, String priority, String threadName, String className,
+			String message, String relatedType) throws Exception;
+
+
+
+	void creatIndex(List<LogModel> logModels, String indexPath);
+
+
+
+
+
+
+
 	
-	List<Integer> getIdsByIndex(int resultCount, String threadName, String className, String message,String relatedType)
-			throws Exception;
+	
+
+
+	
 	
 }
