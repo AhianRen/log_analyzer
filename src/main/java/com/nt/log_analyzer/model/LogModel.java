@@ -17,7 +17,7 @@ public class LogModel {
 	private Integer executeTime;	// 执行时间  	
 	private String className;		// 类名   		索引	 分词   不存
 	private String message; 		// 详细信息        索引	 分词	 不存
-	
+	private int fileId;
 
 	@Override
 	public String toString() {
@@ -26,7 +26,15 @@ public class LogModel {
 				+ "  " + priority + "  " + executeTime + "  " + className + "  "
 				+ message;
 	}
-
+	
+	
+	
+	public int getFileId() {
+		return fileId;
+	}
+	public void setFileId(int fileId) {
+		this.fileId = fileId;
+	}
 	public LogModel() {
 		super();
 	}

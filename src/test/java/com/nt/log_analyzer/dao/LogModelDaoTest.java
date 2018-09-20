@@ -21,21 +21,23 @@ public class LogModelDaoTest {
 	@Autowired
 	private LogModelDao logModelDao;
 	
+	
+	
 	@Test
 	public void test1() {
-		LogModel logModel = logModelDao.selectLogModelById(2);
-		System.out.println(logModel);
+		
+		List<Integer> ids = new ArrayList<>();
+		for(int i=150030;i<150039;i++) {
+			ids.add(i);
+		}
+		List<LogModel> logModels = logModelDao.selectByIds(ids);
+		
+		System.out.println(logModels);
 	}
 	
 	@Test
 	public void test2() throws Exception {
-		SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-		Date fromDate = simpleDateFormat.parse("2017-09-29 11:12:44");
-		Date toDate = simpleDateFormat.parse("2017-09-29 11:12:46");
-		List<LogModel> logModels = logModelDao.selectLogModelsByDateRange(fromDate, toDate);
-		for (LogModel logModel : logModels) {
-			System.out.println(logModel);
-		}
+		
 		
 	}
 	@Test

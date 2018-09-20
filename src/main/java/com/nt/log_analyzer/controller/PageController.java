@@ -10,7 +10,7 @@ public class PageController {
 	public String indexPage() {
 		return "search";
 	}
-	
+
 	
 	
 	

@@ -12,7 +12,7 @@
 		<result property="message" column="message"/> </resultMap> -->
 
 	<sql id="tableName">log</sql>
-	<sql id="insertField">fileName,rowNumber,timeStamp,milliSecond,proceedingId,threadName,priority,executeTime,className,message</sql>
+	<sql id="insertField">fileName,rowNumber,timeStamp,milliSecond,proceedingId,threadName,priority,executeTime,className,message,fileId</sql>
 
 
 	<!-- oracle的insert语句 -->
@@ -34,7 +34,8 @@
 			#{logModel.priority},
 			#{logModel.executeTime},
 			#{logModel.className},
-			#{logModel.message}
+			#{logModel.message},
+			#{logModel.fileId}
 		)
 		</foreach>
 		
@@ -42,7 +43,7 @@
 	
 	
 	
-	<insert id="insertLogModel" parameterType="logModel"
+	<!-- <insert id="insertLogModel" parameterType="logModel"
 		useGeneratedKeys="true" keyProperty="id">
 		insert into
 		<include refid="tableName" />
@@ -114,33 +115,33 @@
 			</if>
 		</trim>
 		)
-	</insert>
+	</insert> -->
 
-	<update id="updateLastMessage" parameterType="string">
+	<!-- <update id="updateLastMessage" parameterType="string">
 		update
 		<include refid="tableName" />
 		set message=#{message} where id=(select a.id from (select max(id) as
 		id from log)as a);
-	</update>
+	</update> -->
 
-	<select id="selectLogModelById" parameterType="int" resultType="logModel">
+	<!-- <select id="selectLogModelById" parameterType="int" resultType="logModel">
 		select id,
 		<include refid="insertField" />
 		from
 		<include refid="tableName" />
 		where id=#{id}
-	</select>
+	</select> -->
 
-	<select id="selectLogModelsByDateRange" resultType="logModel">
+	<!-- <select id="selectLogModelsByDateRange" resultType="logModel">
 		select id,
 		<include refid="insertField" />
 		from
 		<include refid="tableName" />
 		where timeStamp &gt;= #{fromTimeStamp} and timeStamp &lt;=
 		#{toTimeStamp}
-	</select>
+	</select> -->
 
-	<select id="selectAllByIdDesc" resultType="logModel">
+	<!-- <select id="selectAllByIdDesc" resultType="logModel">
 		select id,
 		<include refid="insertField" />
 		from
@@ -151,9 +152,9 @@
 	<select id="selectAllCount" resultType="long">
 		select count(id) from
 		<include refid="tableName" />
-	</select>
+	</select> -->
 
-	<select id="selectResultCountByCondition" resultType="int">
+	<!-- <select id="selectResultCountByCondition" resultType="int">
 		select count(id) from <include refid="tableName" />
 		<trim prefix="where" prefixOverrides="or |and">
 			<if test="ids != null">
@@ -238,12 +239,21 @@
 				</if>
 			</trim>
 	
-			<!-- </where> -->
+			</where>
 			)
 			<if test="size != 0">
 				limit #{startRow},#{size}
 			</if>
+	</select> -->
+
+	<select id="selectByIds" resultType="logModel">
+		select id,<include refid="insertField" /> from <include refid="tableName"/>
+		where
+		<foreach collection="ids" item="item" open="id in (" close=")" separator=",">
+			#{item}
+		</foreach>
 	</select>
+
 
 	<select id="selectAllPriority" resultType="string">
 		select priority from

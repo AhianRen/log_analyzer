@@ -10,7 +10,7 @@ import com.nt.log_analyzer.model.LogModel;
 
 public interface LogModelService {
 
-	List<LogModel> getLogModelsByDateRange(Date fromTimeStamp, Date toTimeStamp);
+	//List<LogModel> getLogModelsByDateRange(Date fromTimeStamp, Date toTimeStamp);
 
 	Map<String, Object> getResultByCondition(String fileName, String timeStamp_from, String timeStamp_to,
 			String threadName, String className, String priority, String message, int startRow, int size,

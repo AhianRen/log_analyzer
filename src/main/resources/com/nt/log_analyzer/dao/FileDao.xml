@@ -17,6 +17,12 @@
 		update file set lastLine=#{lastLine} , lastModified=#{lastModified} where fileId=#{fileId};
 	</update>
 	
-
-
+	<select id="selectAllFile" resultType="fileModel">
+		select fileId,<include refid="insertField"/> from <include refid="tableName"/> 
+	</select>
+	<!-- delete s,u from score as s join t_user as u on s.uId=u.id where u.id=2; -->
+	<delete id="deleteFileAndLog" parameterType="int">
+		delete f,l from file as f join log as l on f.fileId=l.fileId where f.fileId=#{fileId}
+	</delete>
+	
 </mapper>

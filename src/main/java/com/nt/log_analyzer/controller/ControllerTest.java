@@ -3,6 +3,7 @@ package com.nt.log_analyzer.controller;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.ibatis.annotations.Delete;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.nt.log_analyzer.model.config.Config;
 import com.nt.log_analyzer.model.config.MyConfig;
 import com.nt.log_analyzer.service.IndexService;
+import com.nt.log_analyzer.service.Timer;
 import com.nt.log_analyzer.utils.YmlUtil;
 
 @Controller
@@ -29,6 +31,16 @@ public class ControllerTest {
 	@Autowired
 	private IndexService indexService;
 	
+	@Autowired
+	private Timer timer;
+	
+	@RequestMapping("/delete")
+	@ResponseBody
+	public String Delete() {
+		
+		timer.clear();
+		return "删除成功";
+	}
 	
 	@RequestMapping("/config")
 	@ResponseBody
@@ -58,10 +70,6 @@ public class ControllerTest {
 			}*/
 			
 		}
-		
-		
-		
-		
 		return config.toString();
 	}
 	

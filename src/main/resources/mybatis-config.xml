@@ -14,7 +14,7 @@
         <!-- 使用jdbc的getGeneratedKeys获取数据库自增主键值 -->
         <setting name="useGeneratedKeys" value="true"/>
         <!-- 打印sql语句 -->
-		<setting name="logImpl" value="STDOUT_LOGGING" />
+		<!-- <setting name="logImpl" value="STDOUT_LOGGING" /> -->
     </settings>
 
     <!--别名-->

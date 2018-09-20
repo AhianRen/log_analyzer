@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -17,14 +16,16 @@ import java.util.Map;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Store;
+import org.apache.lucene.document.FieldType;
 import org.apache.lucene.document.IntField;
 import org.apache.lucene.document.LongField;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -36,6 +37,7 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
+import org.apache.xml.resolver.helpers.PublicId;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +65,6 @@ public class IndexServiceImpl implements IndexService{
 	@Autowired
 	private LogModelDao logModelDao;
 	
-	
 	@Autowired
 	private Config config;
 	
@@ -79,7 +80,6 @@ public class IndexServiceImpl implements IndexService{
 	@Override
 	@Transactional
 	public void poll() throws Exception {
-		//=============================================
 		String indexPath = config.getIndexpath();
 		List<Map<String,String[]>> configs = config.getConfigs();
 		for (Map<String, String[]> map : configs) {
@@ -106,10 +106,8 @@ public class IndexServiceImpl implements IndexService{
 					fileModel.setLastLine(count);
 					fileModel.setLastModified(file.lastModified());
 					fileDao.insertFileModel(fileModel);
-					
-					//格式化
-					
-					logFileFormatToDBAndIndex(indexPath,file, 1, count, regex, logModelFieldNameArray, dateFormat,filteWorlds);
+					//格式化,入库，创建索引
+					logFileFormatToDBAndIndex(indexPath,fileModel, 1, count, regex, logModelFieldNameArray, dateFormat,filteWorlds);
 					
 				}else if (file.lastModified() == model.getLastModified() ) { //文件未修改
 					logger.info("当前文件未被修改"+file.getAbsolutePath());
@@ -122,33 +120,15 @@ public class IndexServiceImpl implements IndexService{
 					model.setLastLine(count);
 					model.setLastModified(file.lastModified());
 					fileDao.updateById(model);
-					
-					logFileFormatToDBAndIndex(indexPath,file, startRow, count, regex, logModelFieldNameArray, dateFormat,filteWorlds);
-				
-				
+					//格式化,入库，创建索引
+					logFileFormatToDBAndIndex(indexPath,model, startRow, count, regex, logModelFieldNameArray, dateFormat,filteWorlds);
 				}
 			}
-			
-			
-			
 		}
-		
-		//=============================================
-		/*File sourcePath = new File(myConfig.getLogFilePath());
-		File[] listFiles = sourcePath.listFiles();
-		
-		String regex = myConfig.getLogRegex();
-		String dateFormat = myConfig.getDatePattern();
-		String[] logModelFieldNameArray = JsonUtil.jsonStrToStringArray(myConfig.getLogParameter());*/
-
-		
-	
-		
-		
 	}
 	
 	/**
-	 *将logModel插入数据库并创建索引
+	 *创建索引
 	 */
 	@Override
 	public void creatIndex(List<LogModel> logModels,String indexPath){
@@ -166,37 +146,43 @@ public class IndexServiceImpl implements IndexService{
 					//日志相关
 				
 					document.add(new IntField("logModelId", logModel.getId(),Store.YES));
-					document.add(new IntField("rowNumber", logModel.getRowNumber(), Store.YES));
+					
+					FieldType fileIdType = new FieldType();
+					fileIdType.setIndexOptions(IndexOptions.DOCS);
+					fileIdType.setStored(true);
+					fileIdType.setTokenized(false);
+					document.add(new Field("fileId", String.valueOf(logModel.getFileId()), fileIdType));
+					
+					//document.add(new IntField("rowNumber", logModel.getRowNumber(), Store.YES));
 					//==========================================================
 					if (StringUtils.isNotBlank(logModel.getFileName())) {
-						document.add(new TextField("fileName", logModel.getFileName(),Store.YES));
+						document.add(new TextField("fileName", logModel.getFileName(),Store.NO));
 					}
 					if (logModel.getTimeStamp() != null) {
-						document.add(new LongField("timeStamp", logModel.getTimeStamp().getTime(), Store.YES));
+						document.add(new LongField("timeStamp", logModel.getTimeStamp().getTime(), Store.NO));
 					}
 					
-					if (logModel.getMilliSecond()!=null) {
-						document.add(new StoredField("milliSecond", logModel.getMilliSecond()));
-					}
+				//	if (logModel.getMilliSecond()!=null) {
+						//document.add(new StoredField("milliSecond", logModel.getMilliSecond()));
+					//}
 					if (StringUtils.isNotBlank(logModel.getPriority())) {
-						document.add(new TextField("priority", logModel.getPriority(),Store.YES));
+						document.add(new TextField("priority", logModel.getPriority(),Store.NO));
 					}
 					
 					//============================================================
 					
 					if (StringUtils.isNotBlank(logModel.getThreadName())) {
-						document.add(new TextField("threadName", logModel.getThreadName(),Store.YES));
+						document.add(new TextField("threadName", logModel.getThreadName(),Store.NO));
 					}
 					if (StringUtils.isNotBlank(logModel.getClassName())) {
-						document.add(new TextField("className",logModel.getClassName(),Store.YES));
+						document.add(new TextField("className",logModel.getClassName(),Store.NO));
 					}
 					if (StringUtils.isNotBlank(logModel.getMessage())) {
-						document.add(new TextField("message", logModel.getMessage(), Store.YES));
+						document.add(new TextField("message", logModel.getMessage(), Store.NO));
 					}
 					
 					indexWriter.addDocument(document);
 				}
-			
 				
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -215,9 +201,6 @@ public class IndexServiceImpl implements IndexService{
 				e.printStackTrace();
 			}
 		}
-
-		
-		
 	}
 	
 	/**
@@ -272,8 +255,8 @@ public class IndexServiceImpl implements IndexService{
 		TopDocs topDocs = indexSearcher.searchAfter(lastSd, booleanQuery, pageSize);
 		
 		Map<String,Object> map = new HashMap<>();
-		List<LogModel> logModels = new LinkedList<>();
-		
+		//List<LogModel> logModels = new LinkedList<>();
+		List<Integer> ids = new ArrayList<>();
 		if (topDocs.scoreDocs.length==0) {
 			map.put("total", 0);
 			map.put("rows", "");
@@ -282,29 +265,27 @@ public class IndexServiceImpl implements IndexService{
 		
 		for (ScoreDoc scoreDoc:topDocs.scoreDocs) {
 			Document document = indexSearcher.doc(scoreDoc.doc);
-			LogModel logModel = new LogModel();
-			logModel.setId(Integer.parseInt(document.get("logModelId")));
-			logModel.setRowNumber(Integer.parseInt(document.get("rowNumber")));
-			logModel.setFileName(document.get("fileName"));
-			logModel.setTimeStamp(new Date(Long.parseLong(document.get("timeStamp"))));
-			logModel.setMilliSecond(Integer.valueOf(document.get("milliSecond")));
-			logModel.setPriority(document.get("priority"));
-			logModel.setThreadName(document.get("threadName"));
-			logModel.setClassName(document.get("className"));
-			logModel.setMessage(document.get("message"));
-			logModels.add(logModel);
+			ids.add(Integer.valueOf(document.get("logModelId")));
+			//LogModel logModel = new LogModel();
+			//logModel.setId(Integer.parseInt(document.get("logModelId")));
+//		logModel.setRowNumber(Integer.parseInt(document.get("rowNumber")));
+//		logModel.setFileName(document.get("fileName"));
+//		logModel.setTimeStamp(new Date(Long.parseLong(document.get("timeStamp"))));
+//		logModel.setMilliSecond(Integer.valueOf(document.get("milliSecond")));
+//		logModel.setPriority(document.get("priority"));
+//		logModel.setThreadName(document.get("threadName"));
+//		logModel.setClassName(document.get("className"));
+//		logModel.setMessage(document.get("message"));
+//		logModels.add(logModel);
 		}
 		map.put("total", topDocs.totalHits);
-		map.put("rows", logModels);
-		
+		//map.put("rows", logModels);
+		map.put("ids", ids);
 		indexSearcher.getIndexReader().close();
 		
 		return map;
 	}
 	
-	
-	
-	//==============================================
 	/**
 	 * 按行读取log文件，将其格式化为LogModel，并插入数据库、创建索引
 	 * @param file 要格式化的文件
@@ -317,24 +298,19 @@ public class IndexServiceImpl implements IndexService{
 	 * @throws Exception
 	 */
 	@Transactional
-	private void logFileFormatToDBAndIndex(String indexPath,File file,int startRow,long count,String regex,String[] logModelFieldNameArray,
+	private void logFileFormatToDBAndIndex(String indexPath,FileModel fileModel,int startRow,long count,String regex,String[] logModelFieldNameArray,
 			String dateFormat,String[] filteWorlds){
 
 		FileInputStream fis = null;
 		InputStreamReader isr = null;
 		BufferedReader br = null;
 		try {
-			fis = new FileInputStream(file.getAbsolutePath());
+			fis = new FileInputStream(fileModel.getFileAbsolutePath());
 			isr = new InputStreamReader(fis, "UTF-8");
 			br = new BufferedReader(isr);
 			String line = null;
 			
-			
-			//LogModel logModel = new LogModel();
-			
 			Deque<LogModel> deque = new LinkedBlockingDeque<>(11000);
-			
-			
 			
 			for (int i = 1; (line = br.readLine()) != null; i++) {
 				
@@ -372,22 +348,24 @@ public class IndexServiceImpl implements IndexService{
 					}
 					
 					LogModel logModel = new LogModel(); //新建LogModel并赋值
-					logModel.setFileName(file.getAbsolutePath().substring(file.getAbsolutePath().lastIndexOf("\\")+1));
+					logModel.setFileName(fileModel.getFileAbsolutePath().substring(fileModel.getFileAbsolutePath().lastIndexOf("\\")+1));
 					logModel.setRowNumber(i);
-					setLogModel(logModel, matcher, logModelFieldNameArray, dateFormat);
+					logModel.setFileId(fileModel.getFileId());
+					FileUtil.setLogModel(logModel, matcher, logModelFieldNameArray, dateFormat);
 					if (!deque.offerLast(logModel)) { //匹配成功，,从队尾插入队列
-						logger.debug("匹配成功，从队尾插入失败，当前行数："+i);
+						logger.error("匹配成功，从队尾插入失败，当前行数："+i);
 					}
 					
 				} else { //匹配不成功
 					if (deque.isEmpty()) { //第一行匹配不成功
 						LogModel logModel = new LogModel();
 						logModel.setRowNumber(i);
-						logModel.setFileName(file.getAbsolutePath().substring(file.getAbsolutePath().lastIndexOf("\\")+1));
+						logModel.setFileId(fileModel.getFileId());
+						logModel.setFileName(fileModel.getFileAbsolutePath().substring(fileModel.getFileAbsolutePath().lastIndexOf("\\")+1));
 						logModel.setMessage(line);
 						//新建LogModel,从队尾插入队列
 						if (!deque.offerLast(logModel)) {
-							logger.debug("第一行匹配不成功，从队尾插入失败");
+							logger.error("第一行匹配不成功，从队尾插入失败");
 						}
 						
 						
@@ -397,9 +375,8 @@ public class IndexServiceImpl implements IndexService{
 							String str = lastLogModel.getMessage();
 							lastLogModel.setMessage(str==null?line:str+"\n"+line);
 						}else {
-							logger.debug("匹配不成功，获取队尾失败，当前行数："+i);
+							logger.error("匹配不成功，获取队尾失败，当前行数："+i);
 						}
-						 
 					}
 				}
 			}
@@ -439,62 +416,7 @@ public class IndexServiceImpl implements IndexService{
 				e.printStackTrace();
 			}
 		}
-		
-		
 	}
-	
-	
-	
-	/**
-	 * 根据logModelFieldNameArray给logModel属性赋值
-	 * @param logModel
-	 * @param matcher
-	 * @param logModelFieldNameArray
-	 * @param dateFormat
-	 * @throws Exception
-	 */
-	private  void setLogModel(LogModel logModel,Matcher matcher, String[] logModelFieldNameArray, String dateFormat) throws Exception{
-		Class clazz = logModel.getClass();
-		
-		for(int j = 1;j<=matcher.groupCount();j++ ) {
-			String fieldValue = matcher.group(j);
-			
-			Field field = clazz.getDeclaredField(logModelFieldNameArray[j-1]);
-			field.setAccessible(true);
-			String typeName = field.getType().getSimpleName();
-			
-			if ("Date".equals(typeName)) {
-				SimpleDateFormat simpleDateFormat = new SimpleDateFormat(dateFormat);
-				Date date = simpleDateFormat.parse(fieldValue);
-				
-				field.set(logModel, date);
-				continue;
-			}
-			
-			if ("long".equals(typeName) || "Long".equals(typeName)) {
-				long l = Long.parseLong(fieldValue);
-				field.set(logModel, l);
-				continue;
-			}
-			if ("int".equals(typeName) || "Integer".equals(typeName)) {
-				int z = Integer.parseInt(fieldValue);
-				field.set(logModel, z);
-				continue;
-			}
-			field.set(logModel, fieldValue);
-			
-		}
-	}
-	
-	
-	
-	
-	//=======================================================
-	
-	
-	
-	
-	
 	
 
 	
@@ -508,6 +430,7 @@ public class IndexServiceImpl implements IndexService{
 		TopDocs tds = searcher.search(query, num);
 		return tds.scoreDocs[num-1];
 	}
+	
 	
 	
 	/*public List<String> selectByTermName(int count,String key,String termName) throws Exception {

@@ -27,11 +27,11 @@ public class LogModelServiceImpl implements LogModelService{
 	@Autowired
 	private Config config;
 	
-	@Override
+	/*@Override
 	public List<LogModel> getLogModelsByDateRange(Date fromTimeStamp,Date toTimeStamp){
 		return logModelDao.selectLogModelsByDateRange(fromTimeStamp, toTimeStamp);
 	}
-
+*/
 	
 
 /*
@@ -56,9 +56,17 @@ public class LogModelServiceImpl implements LogModelService{
 			timeStamp_to1 = simpleDateFormat.parse(timeStamp_to);
 		}
 		
-		return indexService.selectByIndex(config.getIndexpath(),startRow, size, fileName, timeStamp_from1, timeStamp_to1, priority, threadName, className, message, relatedType);
-		
-		
+		Map<String, Object> map = indexService.selectByIndex(config.getIndexpath(),startRow, size, fileName, timeStamp_from1, timeStamp_to1, priority, threadName, className, message, relatedType);
+		List<Integer> ids = (List<Integer>) map.get("ids");
+		if (ids==null||ids.size()==0) {
+			map.put("rows", "");
+		}else {
+			List<LogModel> logModels = logModelDao.selectByIds(ids);
+			
+			map.put("rows", logModels);
+		}
+		map.remove("ids");
+		return map;
 		/*
 		Map<String, Object> map = new HashMap<>();
 		//TODO 从lucene中查
@@ -91,7 +99,12 @@ public class LogModelServiceImpl implements LogModelService{
 		}
 		*/
 	}
-
-	
+	/*
+	 * 根据fileID删除fileModel和LogModel
+	 */
+	public void deleteFileAndLog(int fileId) {
+		
+		
+	}
 	
 }
